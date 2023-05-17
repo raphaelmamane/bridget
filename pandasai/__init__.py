@@ -26,6 +26,8 @@ from .llm.base import LLM
 class PandasAI:
     """PandasAI is a wrapper around a LLM to make dataframes conversational"""
 
+
+
     _task_instruction: str = """
 Today is {today_date}.
 You are provided with a pandas dataframe (df) with {num_rows} rows and {num_columns} columns.
@@ -111,6 +113,7 @@ Make sure to prefix the requested python code with {START_CODE_TAG} exactly and 
         self,
         data_frame: pd.DataFrame,
         prompt: str,
+        preamble: str = '',
         is_conversational_answer: bool = None,
         show_code: bool = False,
         anonymize_df: bool = True,
@@ -126,6 +129,7 @@ Make sure to prefix the requested python code with {START_CODE_TAG} exactly and 
             df_head = anonymize_dataframe_head(df_head)
 
         code = self._llm.generate_code(
+            preamble +
             self._task_instruction.format(
                 today_date=date.today(),
                 df_head=df_head,
@@ -138,6 +142,7 @@ Make sure to prefix the requested python code with {START_CODE_TAG} exactly and 
             prompt,
         )
         self._original_instructions = {
+            "preamble": preamble,
             "question": prompt,
             "df_head": df_head,
             "num_rows": data_frame.shape[0],
@@ -247,6 +252,7 @@ Code generated:
 
                     count += 1
                     error_correcting_instruction = (
+                        self._original_instructions["preamble"]+
                         self._error_correct_instruction.format(
                             today_date=date.today(),
                             code=code,
