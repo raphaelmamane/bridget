@@ -97,14 +97,14 @@ Make sure to prefix the requested python code with {START_CODE_TAG} exactly and 
         self.notebook = Notebook()
         self._in_notebook = self.notebook.in_notebook()
 
-    def conversational_answer(self, question: str, code: str, answer: str) -> str:
+    def conversational_answer(self, question: str, code: str, answer: str, preamble: str) -> str:
         """Return the conversational answer"""
         if self._enforce_privacy:
             # we don't want to send potentially sensitive data to the LLM server
             # if the user has set enforce_privacy to True
             return answer
 
-        instruction = self._response_instruction.format(
+        instruction = preamble + self._response_instruction.format(
             question=question, code=code, answer=answer
         )
         return self._llm.call(instruction, "")
@@ -171,7 +171,7 @@ Code generated:
         if is_conversational_answer is None:
             is_conversational_answer = self._is_conversational_answer
         if is_conversational_answer:
-            answer = self.conversational_answer(prompt, code, answer)
+            answer = self.conversational_answer(prompt, code, answer, preamble)
             self.log(f"Conversational answer: {answer}")
         return answer
 
