@@ -1,6 +1,7 @@
 """ PandasAI is a wrapper around a LLM to make dataframes convesational """
 import ast
 import io
+import os
 import re
 from contextlib import redirect_stdout
 from datetime import date
@@ -9,6 +10,7 @@ from typing import Optional
 import astor
 import matplotlib.pyplot as plt
 import pandas as pd
+import streamlit as st
 
 from .constants import (
     END_CODE_TAG,
@@ -21,6 +23,9 @@ from .helpers.anonymizer import anonymize_dataframe_head
 from .helpers.notebook import Notebook
 from .llm.base import LLM
 
+FIG = './fig.png'
+if os.path.exists(FIG):
+  os.remove(FIG)
 
 # pylint: disable=too-many-instance-attributes disable=too-many-arguments
 class PandasAI:
@@ -30,7 +35,12 @@ class PandasAI:
 
     _task_instruction: str = """
 Today is {today_date}.
-You are provided with a pandas dataframe (df) with {num_rows} rows and {num_columns} columns.
+
+
+If it is necessary to plot a figure as part of your answer, it is absolutely forbidden to use the show function and 
+rather the figure should be saved to the local folder as a .png with the name 'fig.png'
+
+You are provided with a pandas dataframe with variable name df with {num_rows} rows and {num_columns} columns.
 This is the result of `print(df.head({rows_to_display}))`:
 {df_head}.
 
@@ -41,12 +51,17 @@ Using the provided dataframe, df, return the python code and make sure to prefix
 Question: {question}
 Answer: {answer}
 
-Rewrite the answer to the question in a conversational way.
+Rewrite the answer to the question in a conversational way while still retaining numerical stats.
+Provide this answer in an organized report using Markdown language.
 """
 
     _error_correct_instruction: str = """
 Today is {today_date}.
-You are provided with a pandas dataframe (df) with {num_rows} rows and {num_columns} columns.
+
+If it is necessary to plot a figure as part of your answer, it is absolutely forbidden to use the show function and 
+rather the figure should be saved to the local folder as a .png with the name 'fig.png'
+
+You are provided with a pandas dataframe with variable name df with {num_rows} rows and {num_columns} columns.
 This is the result of `print(df.head({rows_to_display}))`:
 {df_head}.
 
@@ -104,7 +119,7 @@ Make sure to prefix the requested python code with {START_CODE_TAG} exactly and 
             # if the user has set enforce_privacy to True
             return answer
 
-        instruction = preamble + self._response_instruction.format(
+        instruction = self._response_instruction.format(
             question=question, code=code, answer=answer
         )
         return self._llm.call(instruction, "")
@@ -173,6 +188,18 @@ Code generated:
         if is_conversational_answer:
             answer = self.conversational_answer(prompt, code, answer, preamble)
             self.log(f"Conversational answer: {answer}")
+
+
+        # if is_conversational_answer and (answer or os.path.exists(FIG)):
+        #     answer = self.conversational_answer(prompt, code, answer, preamble)
+        #     self.log(f"Conversational answer: {answer}")
+        # elif not answer and  not os.path.exists(FIG):
+        #     answer = "I don't know the answer to that"
+
+        st.markdown(answer)
+        if os.path.exists(FIG):
+            st.image(FIG)
+            os.remove(FIG)
         return answer
 
     def remove_unsafe_imports(self, code: str) -> str:
