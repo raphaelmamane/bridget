@@ -17,3 +17,10 @@ pandasai.egg-info
 
 # command line
 /pandasai_cli.egg-info
+
+#data
+*.csv
+*.parquet
+
+#secrets
+/secrets

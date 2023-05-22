@@ -1,6 +1,7 @@
 """ PandasAI is a wrapper around a LLM to make dataframes convesational """
 import ast
 import io
+import os
 import re
 from contextlib import redirect_stdout
 from datetime import date
@@ -9,6 +10,7 @@ from typing import Optional
 import astor
 import matplotlib.pyplot as plt
 import pandas as pd
+import streamlit as st
 
 from .constants import (
     END_CODE_TAG,
@@ -21,14 +23,24 @@ from .helpers.anonymizer import anonymize_dataframe_head
 from .helpers.notebook import Notebook
 from .llm.base import LLM
 
+FIG = './fig.png'
+if os.path.exists(FIG):
+  os.remove(FIG)
 
 # pylint: disable=too-many-instance-attributes disable=too-many-arguments
 class PandasAI:
     """PandasAI is a wrapper around a LLM to make dataframes conversational"""
 
+
+
     _task_instruction: str = """
 Today is {today_date}.
-You are provided with a pandas dataframe (df) with {num_rows} rows and {num_columns} columns.
+
+
+If it is necessary to plot a figure as part of your answer, it is absolutely forbidden to use the show function and 
+rather the figure should be saved to the local folder as a .png with the name 'fig.png'
+
+You are provided with a pandas dataframe with variable name df with {num_rows} rows and {num_columns} columns.
 This is the result of `print(df.head({rows_to_display}))`:
 {df_head}.
 
@@ -39,12 +51,17 @@ Using the provided dataframe, df, return the python code and make sure to prefix
 Question: {question}
 Answer: {answer}
 
-Rewrite the answer to the question in a conversational way.
+Rewrite the answer to the question in a conversational way while still retaining numerical stats.
+Provide this answer in an organized report using Markdown language.
 """
 
     _error_correct_instruction: str = """
 Today is {today_date}.
-You are provided with a pandas dataframe (df) with {num_rows} rows and {num_columns} columns.
+
+If it is necessary to plot a figure as part of your answer, it is absolutely forbidden to use the show function and 
+rather the figure should be saved to the local folder as a .png with the name 'fig.png'
+
+You are provided with a pandas dataframe with variable name df with {num_rows} rows and {num_columns} columns.
 This is the result of `print(df.head({rows_to_display}))`:
 {df_head}.
 
@@ -95,7 +112,7 @@ Make sure to prefix the requested python code with {START_CODE_TAG} exactly and 
         self.notebook = Notebook()
         self._in_notebook = self.notebook.in_notebook()
 
-    def conversational_answer(self, question: str, code: str, answer: str) -> str:
+    def conversational_answer(self, question: str, code: str, answer: str, preamble: str) -> str:
         """Return the conversational answer"""
         if self._enforce_privacy:
             # we don't want to send potentially sensitive data to the LLM server
@@ -111,6 +128,7 @@ Make sure to prefix the requested python code with {START_CODE_TAG} exactly and 
         self,
         data_frame: pd.DataFrame,
         prompt: str,
+        preamble: str = '',
         is_conversational_answer: bool = None,
         show_code: bool = False,
         anonymize_df: bool = True,
@@ -126,6 +144,7 @@ Make sure to prefix the requested python code with {START_CODE_TAG} exactly and 
             df_head = anonymize_dataframe_head(df_head)
 
         code = self._llm.generate_code(
+            preamble +
             self._task_instruction.format(
                 today_date=date.today(),
                 df_head=df_head,
@@ -138,6 +157,7 @@ Make sure to prefix the requested python code with {START_CODE_TAG} exactly and 
             prompt,
         )
         self._original_instructions = {
+            "preamble": preamble,
             "question": prompt,
             "df_head": df_head,
             "num_rows": data_frame.shape[0],
@@ -163,11 +183,25 @@ Code generated:
         self.code_output = answer
         self.log(f"Answer: {answer}")
 
-        if is_conversational_answer is None:
-            is_conversational_answer = self._is_conversational_answer
-        if is_conversational_answer:
-            answer = self.conversational_answer(prompt, code, answer)
+        # if is_conversational_answer is None:
+        #     is_conversational_answer = self._is_conversational_answer
+        # if is_conversational_answer:
+        #     answer = self.conversational_answer(prompt, code, answer, preamble)
+        #     self.log(f"Conversational answer: {answer}")
+
+
+        if is_conversational_answer and (answer or os.path.exists(FIG)):
+            answer = self.conversational_answer(prompt, code, answer, preamble)
             self.log(f"Conversational answer: {answer}")
+        elif not answer and os.path.exists(FIG):
+            answer = "Here is a figure that might help you:"
+        elif not answer and  not os.path.exists(FIG):
+            answer = "I don't know the answer to that"
+
+        st.markdown(answer)
+        if os.path.exists(FIG):
+            st.image(FIG)
+            os.remove(FIG)
         return answer
 
     def remove_unsafe_imports(self, code: str) -> str:
@@ -247,6 +281,7 @@ Code generated:
 
                     count += 1
                     error_correcting_instruction = (
+                        self._original_instructions["preamble"]+
                         self._error_correct_instruction.format(
                             today_date=date.today(),
                             code=code,
