@@ -21,3 +21,6 @@ pandasai.egg-info
 #data
 *.csv
 *.parquet
+
+#secrets
+/secrets

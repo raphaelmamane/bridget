@@ -183,18 +183,20 @@ Code generated:
         self.code_output = answer
         self.log(f"Answer: {answer}")
 
-        if is_conversational_answer is None:
-            is_conversational_answer = self._is_conversational_answer
-        if is_conversational_answer:
-            answer = self.conversational_answer(prompt, code, answer, preamble)
-            self.log(f"Conversational answer: {answer}")
-
-
-        # if is_conversational_answer and (answer or os.path.exists(FIG)):
+        # if is_conversational_answer is None:
+        #     is_conversational_answer = self._is_conversational_answer
+        # if is_conversational_answer:
         #     answer = self.conversational_answer(prompt, code, answer, preamble)
         #     self.log(f"Conversational answer: {answer}")
-        # elif not answer and  not os.path.exists(FIG):
-        #     answer = "I don't know the answer to that"
+
+
+        if is_conversational_answer and (answer or os.path.exists(FIG)):
+            answer = self.conversational_answer(prompt, code, answer, preamble)
+            self.log(f"Conversational answer: {answer}")
+        elif not answer and os.path.exists(FIG):
+            answer = "Here is a figure that might help you:"
+        elif not answer and  not os.path.exists(FIG):
+            answer = "I don't know the answer to that"
 
         st.markdown(answer)
         if os.path.exists(FIG):

@@ -7,7 +7,7 @@
 # else: 
 #     from collections import MutableSet
 
-import sys
+import sys, os
 sys.path.append('/Users/raphael/bridget')
 
 import pandas as pd
@@ -32,7 +32,10 @@ st.header("Ask Bridget!")
 
 sidebar()
 
-OPENAI_API_KEY = "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"
+api_key_file = os.pardir + '/secrets/openai_key.txt'
+with open(api_key_file, 'r') as f:
+    OPENAI_API_KEY = f.read()
+    f.close()
 llm = OpenAI(api_token=OPENAI_API_KEY)
 
 
